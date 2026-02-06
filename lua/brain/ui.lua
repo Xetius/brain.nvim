@@ -51,9 +51,10 @@ local function create_floating_window(lines, title, start_idx, on_select, on_can
     end
     local cursor = vim.api.nvim_win_get_cursor(win)
     local row = cursor[1] - 1
+    local line_text = vim.api.nvim_buf_get_lines(buf, row, row + 1, false)[1] or ""
     current_highlight = vim.api.nvim_buf_set_extmark(buf, ns, row, 0, {
       end_row = row,
-      end_col = -1,
+      end_col = #line_text,
       hl_group = 'BrainSelected',
       priority = 100,
     })
