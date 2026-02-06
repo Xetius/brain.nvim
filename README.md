@@ -18,7 +18,7 @@ An AI-powered code assistant for Neovim that lets you select code and ask an AI 
 
 ```lua
 use {
-  'yourusername/brain',
+  'Xetius/brain.nvim',
   config = function()
     require('brain').setup({
       default_provider = 'openai', -- or 'anthropic', 'google', 'groq'
@@ -41,7 +41,7 @@ use {
 
 ```lua
 {
-  'yourusername/brain',
+  'Xetius/brain.nvim',
   config = function()
     require('brain').setup({
       default_provider = 'ollama',  -- FREE local option!

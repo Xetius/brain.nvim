@@ -81,13 +81,13 @@ local function create_floating_window(lines, title, on_select, on_cancel)
     if idx < #lines then
       vim.api.nvim_win_set_cursor(win, {idx + 1, 0})
     end
-  end, { buffer = buf, silent = true })
+  end, { buffer = buf, silent = true, nowait = true })
   vim.keymap.set('n', 'k', function()
     local idx = get_current_index()
     if idx > 1 then
       vim.api.nvim_win_set_cursor(win, {idx - 1, 0})
     end
-  end, { buffer = buf, silent = true })
+  end, { buffer = buf, silent = true, nowait = true })
 end
 
 function M.select_model(callback)
