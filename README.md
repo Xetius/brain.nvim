@@ -6,7 +6,7 @@ An AI-powered code assistant for Neovim that lets you select code and ask an AI 
 
 - Select code in visual mode and trigger Brain with `:Brain` or a keybinding
 - Floating window interface for entering your request
-- **Choose from multiple AI providers**: OpenAI, Anthropic, Google Gemini, Groq, **DeepSeek**, **Moonshot (Kimi)**, **Ollama** (free/local), **LM Studio** (free/local)
+- **Choose from multiple AI providers**: OpenAI, Anthropic, Google Gemini, Groq, **DeepSeek**, **Moonshot (Kimi)**, **OpenCode Zen**, **GitHub Copilot**, **Ollama** (free/local), **LM Studio** (free/local)
 - **Model picker UI**: Select which model to use with `<Tab>` in the prompt window
 - **Visual throbber**: Animated indicators show which code Brain is working on
 - Asynchronous AI processing - continue editing while Brain works
@@ -53,6 +53,8 @@ use {
         groq = { api_key = vim.env.GROQ_API_KEY },
         deepseek = { api_key = vim.env.DEEPSEEK_API_KEY },  -- Very affordable
         moonshot = { api_key = vim.env.MOONSHOT_API_KEY },  -- Kimi models
+        opencode_zen = { api_key = vim.env.OPENCODE_ZEN_API_KEY },  -- Curated models
+        github_copilot = {},  -- GitHub Copilot (uses existing auth)
         
         -- Local providers (FREE - no API keys needed!)
         ollama = {},  -- Make sure Ollama is running: http://localhost:11434
@@ -91,6 +93,18 @@ use {
 - **Pricing**: Competitive rates
 - **API Key**: `MOONSHOT_API_KEY` environment variable or `vim.g.brain_moonshot_key`
 
+### OpenCode Zen ⭐ Curated
+- **Models**: Qwen 3 Coder 480B, DeepSeek, Claude 3.5 Sonnet, GPT-4o, and more
+- **Description**: Hand-picked models tested and verified specifically for coding agents
+- **API Key**: `OPENCODE_ZEN_API_KEY` environment variable or `vim.g.brain_opencode_zen_key`
+- **Setup**: Get your API key at [opencode.ai/auth](https://opencode.ai/auth)
+
+### GitHub Copilot
+- **Models**: Claude 3.5 Sonnet, GPT-4o, Gemini 1.5 Pro (depending on subscription)
+- **Requirements**: Active GitHub Copilot subscription (Individual, Business, or Enterprise)
+- **Setup**: Authenticate via OAuth or use existing GitHub Copilot token
+- **Note**: Some models require Copilot Pro+ subscription
+
 ### Ollama 🆓 **FREE & LOCAL**
 - **Models**: CodeLlama, Llama 3.1, Mistral, DeepSeek Coder, Phi-4, Qwen 2.5
 - **Cost**: **Completely FREE!** Runs locally on your machine
@@ -115,7 +129,10 @@ export GOOGLE_API_KEY="your-key"
 export GROQ_API_KEY="your-key"
 export DEEPSEEK_API_KEY="your-key"        # DeepSeek - very affordable
 export MOONSHOT_API_KEY="your-key"        # Moonshot AI (Kimi)
+export OPENCODE_ZEN_API_KEY="your-key"    # OpenCode Zen - curated models
 ```
+
+For GitHub Copilot, authentication is handled via OAuth or your existing GitHub Copilot subscription.
 
 Or in your Neovim config:
 ```lua
@@ -253,6 +270,10 @@ Both work offline and keep your code private.
 1. **DeepSeek** - DeepSeek Coder V2 is extremely capable and costs a fraction of OpenAI
 2. **Moonshot AI (Kimi)** - Kimi K2 models are competitively priced with excellent performance
 3. **Groq** - Fast inference, often has free credits for new users
+4. **OpenCode Zen** - Curated models at competitive rates, tested specifically for coding
+
+### Subscription-Based
+1. **GitHub Copilot** - If you already have a GitHub Copilot subscription, use it with Brain!
 
 ### Premium (Cloud)
 1. **OpenAI** - GPT-4o is state-of-the-art but more expensive
