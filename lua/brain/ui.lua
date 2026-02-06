@@ -12,11 +12,12 @@ local function get_visual_selection()
   return table.concat(lines, "\n"), start_line, end_line
 end
 
-local function create_floating_window(lines, title, on_select, on_cancel)
+local function create_floating_window(lines, title, start_idx, on_select, on_cancel)
   local width = 70
   local height = math.min(#lines + 2, 20)
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
+  start_idx = start_idx or 1
   
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].buftype = 'nofile'
@@ -39,15 +40,28 @@ local function create_floating_window(lines, title, on_select, on_cancel)
   
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   
-  -- Set up highlighting
+  -- Set up highlighting namespace
   local ns = vim.api.nvim_create_namespace('brain-select')
-  for i, line in ipairs(lines) do
-    if line:match('^%s*►') then
-      vim.api.nvim_buf_add_highlight(buf, ns, 'BrainSelected', i - 1, 0, -1)
+  local current_highlight = nil
+  
+  -- Function to update cursor highlight
+  local function update_highlight()
+    if current_highlight then
+      vim.api.nvim_buf_del_extmark(buf, ns, current_highlight)
     end
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    local row = cursor[1] - 1
+    current_highlight = vim.api.nvim_buf_set_extmark(buf, ns, row, 0, {
+      end_row = row,
+      end_col = -1,
+      hl_group = 'BrainSelected',
+      priority = 100,
+    })
   end
   
-  vim.api.nvim_win_set_cursor(win, {1, 0})
+  -- Set initial cursor position and highlight
+  vim.api.nvim_win_set_cursor(win, {start_idx, 0})
+  update_highlight()
   
   -- Helper function to get current selection
   local function get_current_index()
@@ -80,12 +94,28 @@ local function create_floating_window(lines, title, on_select, on_cancel)
     local idx = get_current_index()
     if idx < #lines then
       vim.api.nvim_win_set_cursor(win, {idx + 1, 0})
+      update_highlight()
     end
   end, { buffer = buf, silent = true, nowait = true })
   vim.keymap.set('n', 'k', function()
     local idx = get_current_index()
     if idx > 1 then
       vim.api.nvim_win_set_cursor(win, {idx - 1, 0})
+      update_highlight()
+    end
+  end, { buffer = buf, silent = true, nowait = true })
+  vim.keymap.set('n', '<Down>', function()
+    local idx = get_current_index()
+    if idx < #lines then
+      vim.api.nvim_win_set_cursor(win, {idx + 1, 0})
+      update_highlight()
+    end
+  end, { buffer = buf, silent = true, nowait = true })
+  vim.keymap.set('n', '<Up>', function()
+    local idx = get_current_index()
+    if idx > 1 then
+      vim.api.nvim_win_set_cursor(win, {idx - 1, 0})
+      update_highlight()
     end
   end, { buffer = buf, silent = true, nowait = true })
 end
@@ -100,13 +130,16 @@ function M.select_model(callback)
   
   local lines = {}
   local current = config.get_current_selection()
+  local current_idx = 1
   
   for i, model in ipairs(models) do
-    local marker = (model.provider == current.provider and model.name == current.model) and ' ► ' or '   '
-    table.insert(lines, marker .. model.display)
+    if model.provider == current.provider and model.name == current.model then
+      current_idx = i
+    end
+    table.insert(lines, '  ' .. model.display)
   end
   
-  create_floating_window(lines, 'Select AI Model', function(idx)
+  create_floating_window(lines, 'Select AI Model', current_idx, function(idx)
     local selected = models[idx]
     if selected then
       config.set_model(selected.provider, selected.name)
