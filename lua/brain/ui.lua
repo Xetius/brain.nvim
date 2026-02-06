@@ -519,12 +519,131 @@ local function make_google_request(provider, model, prompt, code, callback)
   end)
 end
 
+local function make_github_copilot_request(provider, model, prompt, code, callback)
+  -- First, we need to get a GitHub Copilot token
+  -- Try multiple methods to get the token
+  local copilot_token = nil
+  
+  -- Method 1: Try using copilot.lua's internal API
+  local ok, copilot_client = pcall(require, 'copilot.client')
+  if ok and copilot_client and copilot_client.get_token then
+    copilot_token = copilot_client.get_token()
+  end
+  
+  -- Method 2: Try to read from GitHub CLI
+  if not copilot_token then
+    local gh_token = vim.fn.system('gh auth token 2>/dev/null'):gsub('%s+', '')
+    if gh_token and #gh_token > 0 and vim.v.shell_error == 0 then
+      -- Exchange GitHub token for Copilot token
+      local stdout = vim.fn.system(string.format(
+        'curl -s -X GET "https://api.github.com/copilot_internal/v2/token" -H "Authorization: Bearer %s" -H "Accept: application/json"',
+        gh_token
+      ))
+      local ok, decoded = pcall(vim.json.decode, stdout)
+      if ok and decoded.token then
+        copilot_token = decoded.token
+      end
+    end
+  end
+  
+  -- Method 3: Try to read token file directly
+  if not copilot_token then
+    local token_path = vim.fn.expand('~/.config/github-copilot/hosts.json')
+    if vim.fn.filereadable(token_path) == 1 then
+      local content = vim.fn.readfile(token_path)
+      if content and #content > 0 then
+        local ok, decoded = pcall(vim.json.decode, table.concat(content, '\n'))
+        if ok then
+          -- The file structure varies, try to extract token
+          for host, data in pairs(decoded) do
+            if data.oauth_token then
+              copilot_token = data.oauth_token
+              break
+            end
+          end
+        end
+      end
+    end
+  end
+  
+  if not copilot_token then
+    vim.notify('Brain: Could not authenticate with GitHub Copilot. Please ensure you have copilot.vim/copilot.lua installed and authenticated, or run "gh auth login".', vim.log.levels.ERROR)
+    return
+  end
+
+  local full_prompt = string.format(
+    "You are a helpful AI coding assistant. Analyze the following code and implement the requested changes:\n\n" ..
+    "REQUEST: %s\n\n" ..
+    "CODE:\n```\n%s\n```\n\n" ..
+    "Provide only the implementation without explanations.",
+    prompt, code
+  )
+  
+  local stdout = vim.loop.new_pipe(false)
+  local stderr = vim.loop.new_pipe(false)
+  local output = {}
+  local error_output = {}
+  
+  local handle
+  handle = vim.loop.spawn('curl', {
+    args = {
+      '-s', 'https://api.githubcopilot.com/chat/completions',
+      '-H', 'Content-Type: application/json',
+      '-H', 'Authorization: Bearer ' .. copilot_token,
+      '-H', 'Editor-Version: Neovim/0.9.0',
+      '-H', 'Copilot-Integration-Id: vscode-chat',
+      '-d', vim.json.encode({
+        model = model,
+        messages = {
+          { role = 'system', content = 'You are a helpful coding assistant. Provide only code, no explanations.' },
+          { role = 'user', content = full_prompt }
+        },
+        temperature = 0.1,
+      })
+    },
+    stdio = { nil, stdout, stderr },
+  }, function(code, signal)
+    stdout:close()
+    stderr:close()
+    handle:close()
+    
+    vim.schedule(function()
+      if code ~= 0 then
+        vim.notify('Brain AI Error: ' .. table.concat(error_output, '\n'), vim.log.levels.ERROR)
+        return
+      end
+      
+      local response = table.concat(output, '\n')
+      local ok, decoded = pcall(vim.json.decode, response)
+      if ok and decoded.choices and decoded.choices[1] then
+        callback(decoded.choices[1].message.content)
+      else
+        vim.notify('Brain: Failed to parse AI response. Response: ' .. response:sub(1, 200), vim.log.levels.ERROR)
+      end
+    end)
+  end)
+  
+  vim.loop.read_start(stdout, function(err, data)
+    assert(not err, err)
+    if data then
+      table.insert(output, data)
+    end
+  end)
+  
+  vim.loop.read_start(stderr, function(err, data)
+    assert(not err, err)
+    if data then
+      table.insert(error_output, data)
+    end
+  end)
+end
+
 function M.call_ai(prompt, code, callback)
   local selection = config.get_current_selection()
   local provider = selection.provider
   local model = selection.model
   
-  if provider == 'openai' or provider == 'groq' or provider == 'deepseek' or provider == 'moonshot' or provider == 'lmstudio' then
+  if provider == 'openai' or provider == 'groq' or provider == 'deepseek' or provider == 'moonshot' or provider == 'lmstudio' or provider == 'opencode_zen' then
     -- OpenAI-compatible APIs
     make_openai_request(provider, model, prompt, code, callback)
   elseif provider == 'anthropic' then
@@ -533,6 +652,8 @@ function M.call_ai(prompt, code, callback)
     make_google_request(provider, model, prompt, code, callback)
   elseif provider == 'ollama' then
     make_ollama_request(provider, model, prompt, code, callback)
+  elseif provider == 'github_copilot' then
+    make_github_copilot_request(provider, model, prompt, code, callback)
   else
     vim.notify('Brain: Unknown provider ' .. provider, vim.log.levels.ERROR)
   end

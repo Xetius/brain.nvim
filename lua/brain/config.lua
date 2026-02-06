@@ -89,6 +89,27 @@ M.config = {
       },
       default_model = 'moonshot-v1-32k',
     },
+    opencode_zen = {
+      api_key = nil, -- Set via vim.g.brain_opencode_zen_key or $OPENCODE_ZEN_API_KEY
+      base_url = 'https://opencode.ai/api/v1',
+      models = {
+        { name = 'qwen3-coder-480b', label = 'Qwen 3 Coder 480B', description = 'Hand-picked coding model' },
+        { name = 'deepseek', label = 'DeepSeek', description = 'DeepSeek model' },
+        { name = 'claude-3-5-sonnet', label = 'Claude 3.5 Sonnet', description = 'Anthropic Claude 3.5 Sonnet' },
+        { name = 'gpt-4o', label = 'GPT-4o', description = 'OpenAI GPT-4o' },
+      },
+      default_model = 'qwen3-coder-480b',
+    },
+    github_copilot = {
+      api_key = nil, -- Uses GitHub Copilot authentication
+      base_url = 'https://api.github.com/copilot',
+      models = {
+        { name = 'claude-3.5-sonnet', label = 'Claude 3.5 Sonnet', description = 'Anthropic Claude 3.5 Sonnet via Copilot' },
+        { name = 'gpt-4o', label = 'GPT-4o', description = 'OpenAI GPT-4o via Copilot' },
+        { name = 'gemini-1.5-pro', label = 'Gemini 1.5 Pro', description = 'Google Gemini 1.5 Pro via Copilot' },
+      },
+      default_model = 'claude-3.5-sonnet',
+    },
   },
 }
 
@@ -133,6 +154,7 @@ function M.load_api_keys()
     groq = 'GROQ_API_KEY',
     deepseek = 'DEEPSEEK_API_KEY',
     moonshot = 'MOONSHOT_API_KEY',
+    opencode_zen = 'OPENCODE_ZEN_API_KEY',
   }
   
   for provider, env_var in pairs(env_vars) do
@@ -147,6 +169,39 @@ function M.load_api_keys()
   end
   if not M.config.providers.lmstudio.api_key then
     M.config.providers.lmstudio.api_key = 'lmstudio-local'
+  end
+  
+  -- Check for GitHub Copilot authentication
+  -- Try to get token from copilot.lua plugin or check for token file
+  if not M.config.providers.github_copilot.api_key then
+    local copilot_token = nil
+    
+    -- Try to get token from copilot.lua plugin's internal state
+    local ok, copilot = pcall(require, 'copilot')
+    if ok then
+      -- copilot.lua is installed, check if authenticated
+      copilot_token = 'copilot-authenticated'
+    end
+    
+    -- Alternative: check for GitHub CLI token
+    if not copilot_token then
+      local gh_token = vim.fn.system('gh auth token 2>/dev/null'):gsub('%s+', '')
+      if gh_token and #gh_token > 0 and vim.v.shell_error == 0 then
+        copilot_token = 'gh-cli-auth'
+      end
+    end
+    
+    -- Check for Copilot token file
+    if not copilot_token then
+      local token_path = vim.fn.expand('~/.config/github-copilot/hosts.json')
+      if vim.fn.filereadable(token_path) == 1 then
+        copilot_token = 'copilot-token-file'
+      end
+    end
+    
+    if copilot_token then
+      M.config.providers.github_copilot.api_key = copilot_token
+    end
   end
 end
 
